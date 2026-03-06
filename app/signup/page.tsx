@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { auth } from "../../src/firebase/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const router = useRouter();
 
   const handleSignup = async () => {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      alert("User created successfully 🚀");
+      // user is signed in after createUserWithEmailAndPassword
+      router.push("/dashboard");
     } catch (error: any) {
       alert(error.message);
     }
