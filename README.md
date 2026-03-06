@@ -73,6 +73,16 @@ Which to use?
 
 The server initializer will prefer `FIREBASE_SERVICE_ACCOUNT` (stringified JSON), then `service-account.json` at the project root, then `GOOGLE_APPLICATION_CREDENTIALS` (ADC).
 
+Admin UI note
+
+To enable the admin UI for the admin user created by the scripts, set the following environment variable locally or in your hosting provider:
+
+```env
+NEXT_PUBLIC_ADMIN_EMAIL=admin@dsa-verse.test
+```
+
+This value should match the admin account created by `scripts/create_admin.js`.
+
 Continuous integration and deploy
 
 This repo includes a GitHub Actions workflow at `.github/workflows/ci.yml` that:
