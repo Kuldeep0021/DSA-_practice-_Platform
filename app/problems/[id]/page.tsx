@@ -1,317 +1,460 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
-import CodeMirror from "@uiw/react-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
-import Navbar from "../../../src/components/Navbar";
-import ProtectedRoute from "../../../src/components/ProtectedRoute";
-import { auth } from "../../../src/firebase/firebase";
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  deleteDoc,
-} from "firebase/firestore";
-import { firestore } from "../../../src/firebase/firebase";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { auth } from "@/src/firebase/firebase";
+import Navbar from "@/src/components/Navbar";
+import ProtectedRoute from "@/src/components/ProtectedRoute";
+import MonacoCodeEditor, { type MonacoLanguage } from "@/src/components/MonacoCodeEditor";
+import DifficultyBadge from "@/src/components/ui/DifficultyBadge";
+import StatusBadge from "@/src/components/ui/StatusBadge";
+import SurfaceCard from "@/src/components/ui/SurfaceCard";
+import type {
+  Problem,
+  RunResult,
+  SubmissionStatus,
+  SupportedLanguage,
+} from "@/src/types/domain";
+import { getErrorMessage } from "@/src/utils/errors";
 
-// likes collection: documents with { userEmail, problemId, type: 'like'|'dislike', createdAt }
+const DEFAULT_STARTER_CODE: Record<SupportedLanguage, string> = {
+  javascript: `function solution(...args) {
+  // Write your solution here.
+  return null;
+}`,
+  python: `def solution(*args):
+    # Write your solution here.
+    return None`,
+};
 
+const LANGUAGE_OPTIONS: Array<{ value: SupportedLanguage; label: string }> = [
+  { value: "javascript", label: "JavaScript" },
+  { value: "python", label: "Python" },
+];
 
-export default function ProblemDetail() {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isRunResult(value: unknown): value is RunResult {
+  if (!isRecord(value)) return false;
+  return typeof value.passedAll === "boolean" && Array.isArray(value.results);
+}
+
+function getProblemIdFromParams(params: ReturnType<typeof useParams>): string {
+  const raw = params.id;
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw) && raw.length > 0) return raw[0];
+  return "";
+}
+
+function getLanguageStorageKey(problemId: string): string {
+  return `editor_language_${problemId}`;
+}
+
+function getCodeStorageKey(problemId: string, language: SupportedLanguage): string {
+  return `editor_code_${problemId}_${language}`;
+}
+
+interface SubmitResponse {
+  ok?: boolean;
+  submissionId?: string;
+  status?: SubmissionStatus;
+  result?: RunResult;
+  error?: string;
+}
+
+export default function ProblemDetailPage() {
   const params = useParams();
-  const { id } = params;
+  const router = useRouter();
+  const problemId = getProblemIdFromParams(params);
 
-  const [code, setCode] = useState("// Write your code here");
-  const [output, setOutput] = useState("");
-  const [problem, setProblem] = useState<any>(null);
-  const [prevId, setPrevId] = useState<string | null>(null);
-  const [nextId, setNextId] = useState<string | null>(null);
-  const [starred, setStarred] = useState(false);
-  const [favDocId, setFavDocId] = useState<string | null>(null);
-  const [likesCount, setLikesCount] = useState<number>(0);
-  const [userVote, setUserVote] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [loadingProblem, setLoadingProblem] = useState(true);
+  const [problemError, setProblemError] = useState<string | null>(null);
+
+  const [language, setLanguage] = useState<SupportedLanguage>("javascript");
+  const [code, setCode] = useState(DEFAULT_STARTER_CODE.javascript);
+
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<SubmissionStatus | null>(null);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchProblem = async () => {
+    const loadProblem = async () => {
+      if (!problemId) {
+        setLoadingProblem(false);
+        setProblemError("Invalid problem id.");
+        return;
+      }
+
+      setLoadingProblem(true);
+      setProblemError(null);
+
       try {
-        const d = await getDoc(doc(firestore, "problems", id as string));
-        if (d.exists()) {
-          const raw = d.data() as any;
-          // some seeds store test cases as JSON string (testCasesJson)
-          if (!raw.testCases && raw.testCasesJson && typeof raw.testCasesJson === 'string') {
-            try {
-              raw.testCases = JSON.parse(raw.testCasesJson);
-            } catch (e) {
-              raw.testCases = [];
-            }
-          }
-          setProblem({ id: d.id, ...raw });
-        } else {
-          // fallback to basic sample if not found
-          setProblem({ id, title: "Unknown Problem", description: "No description available." });
+        const response = await fetch(`/api/problems/${problemId}`);
+        const payload = (await response.json().catch(() => ({}))) as {
+          problem?: Problem;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.problem) {
+          throw new Error(payload.error || "Failed to load problem.");
         }
 
-        // fetch all problem ids to compute prev/next
-        const snap = await getDocs(collection(firestore, "problems"));
-        const ids: string[] = [];
-        snap.forEach((doc) => ids.push(doc.id));
-        const idx = ids.indexOf(id as string);
-        if (idx !== -1) {
-          setPrevId(ids[idx - 1] ?? null);
-          setNextId(ids[idx + 1] ?? null);
-        }
+        setProblem(payload.problem);
 
-        // check favorite
-        const user = auth.currentUser;
-        if (user) {
-          const q = query(
-            collection(firestore, "favorites"),
-            where("userEmail", "==", user.email),
-            where("problemId", "==", id)
-          );
+        const savedLanguage = localStorage.getItem(getLanguageStorageKey(problemId));
+        const selectedLanguage =
+          savedLanguage === "python" || savedLanguage === "javascript"
+            ? savedLanguage
+            : "javascript";
 
-          const favSnap = await getDocs(q);
-          if (!favSnap.empty) {
-            const first = favSnap.docs[0];
-            setStarred(true);
-            setFavDocId(first.id);
-          }
-        }
-      } catch (err) {
-        setProblem({ id, title: "Unknown Problem", description: "No description available." });
+        const savedCode = localStorage.getItem(
+          getCodeStorageKey(problemId, selectedLanguage)
+        );
+        const starter =
+          payload.problem.starterCode[selectedLanguage] ||
+          DEFAULT_STARTER_CODE[selectedLanguage];
+
+        setLanguage(selectedLanguage);
+        setCode(savedCode || starter);
+      } catch (err: unknown) {
+        setProblemError(getErrorMessage(err, "Failed to load problem."));
+      } finally {
+        setLoadingProblem(false);
       }
     };
 
-    fetchProblem();
-  }, [id]);
+    loadProblem();
+  }, [problemId]);
 
   useEffect(() => {
-    const fetchLikes = async () => {
-      try {
-        const snap = await getDocs(collection(firestore, "likes"));
-        let cnt = 0;
-        let uv: string | null = null;
-        snap.forEach((d) => {
-          const data = d.data() as any;
-          if (data.problemId !== id) return;
-          if (data.type === "like") cnt++;
-          if (auth.currentUser && data.userEmail === auth.currentUser.email) {
-            uv = data.type;
-          }
-        });
+    if (!problemId) return;
+    localStorage.setItem(getLanguageStorageKey(problemId), language);
+  }, [problemId, language]);
 
-        setLikesCount(cnt);
-        setUserVote(uv);
-      } catch (err) {
-        // ignore
-      }
-    };
+  useEffect(() => {
+    if (!problemId) return;
+    localStorage.setItem(getCodeStorageKey(problemId, language), code);
+  }, [problemId, language, code]);
 
-    fetchLikes();
-  }, [id]);
+  const handleLanguageChange = (nextLanguage: SupportedLanguage) => {
+    setLanguage(nextLanguage);
+    if (!problem) {
+      setCode(DEFAULT_STARTER_CODE[nextLanguage]);
+      return;
+    }
+
+    const saved = localStorage.getItem(getCodeStorageKey(problem.id, nextLanguage));
+    const starter = problem.starterCode[nextLanguage] || DEFAULT_STARTER_CODE[nextLanguage];
+    setCode(saved || starter);
+  };
 
   const handleRun = async () => {
-    // Run user code against test cases (client-side)
-    setOutput("Running tests...");
+    if (!problem) return;
 
-    const cases = (problem?.testCases as any[]) || [];
-    if (cases.length === 0) {
-      setOutput("No test cases defined for this problem.");
+    setRunError(null);
+    setSubmitError(null);
+    setSubmitMessage(null);
+    setIsRunning(true);
+
+    if (problem.testCases.length === 0) {
+      setRunError("This problem does not have test cases yet.");
+      setIsRunning(false);
       return;
     }
 
-    // Save code to localStorage
     try {
-      localStorage.setItem(`code_problem_${id}`, code);
-    } catch (e) {
-      // ignore
-    }
-
-    // Evaluate
-    const results: { passed: boolean; expected: any; actual: any; input: any }[] = [];
-    for (const tc of cases) {
-      try {
-        // We expect user to define a function named `solution` in their code.
-        const wrapped = `${code}\n;return typeof solution === 'function' ? solution(...INPUT) : (typeof module !== 'undefined' && module.exports ? module.exports : null)`;
-
-        // Create a function that injects INPUT and runs the code
-        const fn = new Function('INPUT', wrapped);
-        const actual = fn(tc.input);
-        const passed = JSON.stringify(actual) === JSON.stringify(tc.output);
-        results.push({ passed, expected: tc.output, actual, input: tc.input });
-      } catch (err) {
-        results.push({ passed: false, expected: tc.output, actual: String(err), input: tc.input });
-      }
-    }
-
-    const passedAll = results.every((r) => r.passed);
-    setOutput(JSON.stringify({ passedAll, results }, null, 2));
-
-    // Save a run submission record (not a final submit)
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      await addDoc(collection(firestore, "submissions"), {
-        userEmail: user.email,
-        problemId: id,
-        code: code,
-        result: { passedAll, results },
-        createdAt: serverTimestamp(),
+      const response = await fetch("/api/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language,
+          code,
+          testCases: problem.testCases,
+        }),
       });
-    } catch (error) {
-      console.error("Error saving submission:", error);
-    }
-  };
 
-  useEffect(() => {
-    // Load saved code from localStorage
-    try {
-      const saved = localStorage.getItem(`code_problem_${id}`);
-      if (saved) setCode(saved);
-    } catch (e) {}
-  }, [id]);
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        passedAll?: boolean;
+        results?: unknown[];
+      };
 
-  const toggleStar = async () => {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("Please login to star problems");
-      return;
-    }
-
-    try {
-      if (starred && favDocId) {
-        await deleteDoc(doc(firestore, "favorites", favDocId));
-        setStarred(false);
-        setFavDocId(null);
-      } else {
-        const ref = await addDoc(collection(firestore, "favorites"), {
-          userEmail: user.email,
-          problemId: id,
-          createdAt: serverTimestamp(),
-        });
-        setStarred(true);
-        setFavDocId(ref.id);
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to run code.");
       }
-    } catch (err) {
-      console.error(err);
+
+      if (!isRunResult(payload)) {
+        throw new Error("Invalid run response from server.");
+      }
+
+      setRunResult(payload);
+    } catch (err: unknown) {
+      setRunError(getErrorMessage(err, "Failed to run code."));
+    } finally {
+      setIsRunning(false);
     }
   };
 
-  const toggleLike = async (type: "like" | "dislike") => {
-    const user = auth.currentUser;
-    if (!user) {
-      alert("Please login to vote");
-      return;
-    }
+  const handleSubmit = async () => {
+    if (!problem) return;
+
+    setSubmitError(null);
+    setSubmitMessage(null);
+    setIsSubmitting(true);
 
     try {
-      // check existing
-      const q = query(
-        collection(firestore, "likes"),
-        where("userEmail", "==", user.email),
-        where("problemId", "==", id)
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        router.replace("/login");
+        return;
+      }
+
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          problemId: problem.id,
+          language,
+          code,
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as SubmitResponse;
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to submit solution.");
+      }
+
+      if (!payload.status) {
+        throw new Error("Submission response did not include a status.");
+      }
+
+      setSubmitStatus(payload.status);
+      setSubmitMessage(
+        payload.status === "accepted"
+          ? "Submission accepted."
+          : "Submission saved with failed test cases."
       );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        const first = snap.docs[0];
-        const data = first.data() as any;
-        if (data.type === type) {
-          // undo
-          await deleteDoc(first.ref);
-          setUserVote(null);
-        } else {
-          // change: delete and add new
-          await deleteDoc(first.ref);
-          await addDoc(collection(firestore, "likes"), {
-            userEmail: user.email,
-            problemId: id,
-            type,
-            createdAt: serverTimestamp(),
-          });
-          setUserVote(type);
-        }
-      } else {
-        await addDoc(collection(firestore, "likes"), {
-          userEmail: user.email,
-          problemId: id,
-          type,
-          createdAt: serverTimestamp(),
-        });
-        setUserVote(type);
-      }
 
-      // refresh counts
-      const all = await getDocs(collection(firestore, "likes"));
-      let cnt = 0;
-      all.forEach((d) => {
-        const data = d.data() as any;
-        if (data.problemId === id && data.type === "like") cnt++;
-      });
-      setLikesCount(cnt);
-    } catch (err) {
-      console.error(err);
+      if (payload.result && isRunResult(payload.result)) {
+        setRunResult(payload.result);
+      }
+    } catch (err: unknown) {
+      setSubmitError(getErrorMessage(err, "Failed to submit solution."));
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
+  if (loadingProblem) {
+    return (
+      <ProtectedRoute>
+        <>
+          <Navbar />
+          <div className="min-h-screen bg-[#0f1117] text-slate-100 p-8">Loading problem...</div>
+        </>
+      </ProtectedRoute>
+    );
+  }
+
+  if (!problem || problemError) {
+    return (
+      <ProtectedRoute>
+        <>
+          <Navbar />
+          <div className="min-h-screen bg-[#0f1117] text-slate-100 p-8">
+            <p className="text-rose-300 mb-4">{problemError || "Problem not found."}</p>
+            <Link
+              href="/problems"
+              className="inline-flex rounded-lg bg-amber-400 px-3 py-1.5 text-sm font-semibold text-slate-900"
+            >
+              Back to Problems
+            </Link>
+          </div>
+        </>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
       <>
         <Navbar />
-        <div className="min-h-screen bg-black text-white p-8">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold mb-4">{problem?.title}</h1>
-              <p className="mb-6 text-gray-400">{problem?.description}</p>
-            </div>
+        <div className="min-h-screen bg-[#0f1117] text-slate-100 px-4 py-8 md:px-8">
+          <div className="mx-auto w-full max-w-7xl space-y-6">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <SurfaceCard className="p-5 md:p-6 space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <DifficultyBadge difficulty={problem.difficulty} />
+                    <span className="text-xs uppercase tracking-wide text-slate-500">
+                      Problem
+                    </span>
+                  </div>
+                  <h1 className="text-2xl md:text-3xl font-bold">{problem.title}</h1>
+                  <p className="text-slate-300 leading-relaxed">{problem.description}</p>
+                </div>
 
-            <div className="flex flex-col items-end gap-2">
-              <button
-                onClick={toggleStar}
-                className={`px-3 py-1 rounded ${starred ? 'bg-yellow-500 text-black' : 'bg-gray-700'}`}>
-                {starred ? '★ Starred' : '☆ Star'}
-              </button>
-
-              <div className="flex gap-2">
-                {prevId && (
-                  <a href={`/problems/${prevId}`} className="bg-gray-700 px-3 py-1 rounded">Previous</a>
+                {problem.examples.length > 0 && (
+                  <section className="space-y-3">
+                    <h2 className="text-lg font-semibold text-slate-100">Examples</h2>
+                    {problem.examples.map((example, index) => (
+                      <div
+                        key={`${example.input}-${index}`}
+                        className="rounded-lg border border-slate-700 bg-[#131822] p-4"
+                      >
+                        <p className="text-sm text-slate-200">
+                          <span className="font-semibold text-slate-100">Input:</span>{" "}
+                          {example.input}
+                        </p>
+                        <p className="text-sm text-slate-200 mt-1">
+                          <span className="font-semibold text-slate-100">Output:</span>{" "}
+                          {example.output}
+                        </p>
+                        {example.explanation && (
+                          <p className="text-sm text-slate-400 mt-2">{example.explanation}</p>
+                        )}
+                      </div>
+                    ))}
+                  </section>
                 )}
-                {nextId && (
-                  <a href={`/problems/${nextId}`} className="bg-gray-700 px-3 py-1 rounded">Next</a>
+
+                {problem.constraints.length > 0 && (
+                  <section className="space-y-2">
+                    <h2 className="text-lg font-semibold text-slate-100">Constraints</h2>
+                    <ul className="space-y-1.5 text-sm text-slate-300">
+                      {problem.constraints.map((constraint) => (
+                        <li key={constraint} className="flex gap-2">
+                          <span className="text-slate-500">-</span>
+                          <span>{constraint}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </SurfaceCard>
+
+              <div className="space-y-4 xl:sticky xl:top-6 h-fit">
+                <SurfaceCard className="p-4 md:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Editor</p>
+                      <p className="text-sm text-slate-300">Language and actions</p>
+                    </div>
+                    <select
+                      value={language}
+                      onChange={(event) => handleLanguageChange(event.target.value as SupportedLanguage)}
+                      className="rounded-lg border border-slate-700 bg-[#11151d] px-3 py-2 text-sm text-slate-100 outline-none focus:border-amber-400/80"
+                    >
+                      {LANGUAGE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <MonacoCodeEditor
+                    value={code}
+                    language={language as MonacoLanguage}
+                    onChange={setCode}
+                    height={390}
+                  />
+
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleRun();
+                      }}
+                      disabled={isRunning}
+                      className="rounded-lg border border-slate-700 bg-[#1b2330] px-4 py-2 text-sm font-medium text-slate-200 hover:bg-[#263247] disabled:opacity-60"
+                    >
+                      {isRunning ? "Running..." : "Run"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleSubmit();
+                      }}
+                      disabled={isSubmitting}
+                      className="rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-300 disabled:opacity-70"
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit"}
+                    </button>
+                  </div>
+                </SurfaceCard>
+
+                {(runError || submitError) && (
+                  <SurfaceCard className="p-4">
+                    {runError && <p className="text-sm text-rose-300">{runError}</p>}
+                    {submitError && <p className="text-sm text-rose-300 mt-2">{submitError}</p>}
+                  </SurfaceCard>
+                )}
+
+                {submitMessage && submitStatus && (
+                  <SurfaceCard className="p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <p className="font-medium text-slate-100">{submitMessage}</p>
+                      <StatusBadge status={submitStatus} />
+                    </div>
+                    <Link
+                      href="/submissions"
+                      className="inline-flex mt-3 text-sm text-amber-300 hover:text-amber-200"
+                    >
+                      View submission history
+                    </Link>
+                  </SurfaceCard>
                 )}
               </div>
             </div>
+
+            {runResult && (
+              <SurfaceCard className="p-5 md:p-6">
+                <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+                  <h2 className="text-lg font-semibold">Run Results</h2>
+                  <StatusBadge status={runResult.passedAll ? "accepted" : "wrong_answer"} />
+                </div>
+
+                <div className="space-y-3">
+                  {runResult.results.map((result, index) => (
+                    <div
+                      key={`case-${index}`}
+                      className="rounded-lg border border-slate-700 bg-[#131822] p-4"
+                    >
+                      <p
+                        className={`text-sm font-semibold ${
+                          result.passed ? "text-emerald-300" : "text-rose-300"
+                        }`}
+                      >
+                        Test Case {index + 1}: {result.passed ? "Passed" : "Failed"}
+                      </p>
+                      <div className="grid gap-1 text-sm text-slate-300 mt-2">
+                        <p>Input: {JSON.stringify(result.input)}</p>
+                        <p>Expected: {JSON.stringify(result.expected)}</p>
+                        <p>Actual: {JSON.stringify(result.actual)}</p>
+                      </div>
+                      {result.error && (
+                        <p className="mt-2 text-sm text-amber-300">{result.error}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </SurfaceCard>
+            )}
           </div>
-
-          <div className="mb-4">
-            <CodeMirror
-              value={code}
-              height="300px"
-              theme="dark"
-              extensions={[javascript()]}
-              onChange={(value) => setCode(value)}
-            />
-          </div>
-
-          <button
-            onClick={handleRun}
-            className="bg-green-600 px-4 py-2 rounded hover:bg-green-700 mb-4"
-          >
-            Run Code
-          </button>
-
-          {output && (
-            <div className="bg-gray-900 p-4 rounded">
-              <h2 className="font-semibold mb-2">Output:</h2>
-              <pre>{output}</pre>
-            </div>
-          )}
         </div>
       </>
     </ProtectedRoute>

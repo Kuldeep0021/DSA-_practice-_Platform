@@ -3,26 +3,24 @@
 import { useEffect, useState } from "react";
 import { auth } from "../../src/firebase/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { useRouter } from "next/navigation";
 import Navbar from "../../src/components/Navbar";
+import ProtectedRoute from "@/src/components/ProtectedRoute";
+import Link from "next/link";
 
 export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const router = useRouter();
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        router.push("/login");
-      } else {
-        setUserEmail(user.email);
-      }
+      setUserEmail(user?.email ?? user?.uid ?? null);
+      setAuthReady(true);
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
-  if (!userEmail) {
+  if (!authReady) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         Checking authentication...
@@ -31,14 +29,31 @@ export default function Dashboard() {
   }
 
   return (
-    <>
-      <Navbar />
-      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
-        <h1 className="text-3xl font-bold mb-4">
-          Welcome to Dashboard 🚀
-        </h1>
-        <p>Logged in as: {userEmail}</p>
-      </div>
-    </>
+    <ProtectedRoute>
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-black text-white px-8 py-12">
+          <h1 className="text-3xl font-bold mb-3">Welcome to DSA Verse</h1>
+          <p className="text-gray-300 mb-8">Logged in as: {userEmail}</p>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <Link href="/problems" className="surface rounded p-4 hover:border-white/20 transition">
+              <h2 className="font-semibold mb-2">Solve Problems</h2>
+              <p className="text-sm muted">Browse the full problem list and start coding.</p>
+            </Link>
+
+            <Link href="/submissions" className="surface rounded p-4 hover:border-white/20 transition">
+              <h2 className="font-semibold mb-2">Submission History</h2>
+              <p className="text-sm muted">Review your accepted and failed submissions.</p>
+            </Link>
+
+            <Link href="/admin/problems" className="surface rounded p-4 hover:border-white/20 transition">
+              <h2 className="font-semibold mb-2">Admin Problems</h2>
+              <p className="text-sm muted">Create and manage problems if you are an admin.</p>
+            </Link>
+          </div>
+        </div>
+      </>
+    </ProtectedRoute>
   );
 }

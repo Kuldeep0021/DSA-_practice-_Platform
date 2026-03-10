@@ -1,20 +1,40 @@
-import { NextResponse } from 'next/server';
-import { getAuth, getFirestore, getAdmin } from '../../../lib/firebaseAdmin';
+import { NextResponse } from "next/server";
+import { getAdmin, getAuth, getFirestore } from "@/lib/firebaseAdmin";
+import { getErrorMessage } from "@/src/utils/errors";
 
-export async function POST(req: Request) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export async function POST(request: Request) {
   try {
-    const app = getAdmin();
-    const body = await req.json().catch(() => ({}));
-    const email = body.email || 'demo@dsa-verse.test';
-    const password = body.password || 'password123';
+    const admin = getAdmin();
+    const body = (await request.json().catch(() => ({}))) as unknown;
+    const payload = isRecord(body) ? body : {};
+
+    const email =
+      typeof payload.email === "string" && payload.email.trim().length > 0
+        ? payload.email.trim()
+        : "demo@dsa-verse.test";
+
+    const password =
+      typeof payload.password === "string" && payload.password.trim().length > 0
+        ? payload.password
+        : "password123";
 
     const userRecord = await getAuth().createUser({ email, password });
 
     const db = getFirestore();
-    await db.collection('users').doc(userRecord.uid).set({ email, createdAt: app.firestore.FieldValue.serverTimestamp() });
+    await db.collection("users").doc(userRecord.uid).set({
+      email,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
     return NextResponse.json({ ok: true, uid: userRecord.uid, email });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, message: err.message || String(err) }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { ok: false, message: getErrorMessage(error, "Failed to create demo user.") },
+      { status: 500 }
+    );
   }
 }

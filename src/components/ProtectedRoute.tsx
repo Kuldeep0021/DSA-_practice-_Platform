@@ -6,27 +6,34 @@ import { auth } from "../firebase/firebase";
 import { useRouter } from "next/navigation";
 
 export default function ProtectedRoute({ children }: PropsWithChildren) {
-  const [loading, setLoading] = useState(true);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        router.push("/login");
+        setIsAuthenticated(false);
+        router.replace("/login");
       } else {
-        setLoading(false);
+        setIsAuthenticated(true);
       }
+      setCheckingAuth(false);
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  if (loading) {
+  if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
         <p>Loading...</p>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   return <>{children}</>;

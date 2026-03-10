@@ -6,7 +6,7 @@ function loadServiceAccount(): admin.ServiceAccount | null {
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
       return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT as string) as admin.ServiceAccount;
-    } catch (e) {
+    } catch {
       console.warn('FIREBASE_SERVICE_ACCOUNT is set but invalid JSON.');
     }
   }
