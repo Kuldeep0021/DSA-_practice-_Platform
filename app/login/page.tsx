@@ -38,7 +38,7 @@ export default function Login() {
             DSA Verse
           </p>
           <h1 className="mt-3 text-4xl font-bold leading-tight">
-            Prepare for coding interviews with a LeetCode-style workflow.
+            Prepare for coding interviews with a structured practice workflow.
           </h1>
           <p className="mt-4 text-slate-400 max-w-md">
             Solve curated problems, run code instantly, and track submissions in one place.

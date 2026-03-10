@@ -96,7 +96,7 @@ export default function ProblemsPage() {
               </p>
               <h1 className="text-3xl md:text-4xl font-bold">Practice Problems</h1>
               <p className="text-slate-400 text-sm md:text-base">
-                Filter by difficulty and tags just like a LeetCode problem list.
+                Filter by difficulty and tags with a focused problem-list workflow.
               </p>
             </div>
 

@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "DSA Verse - Practice Coding Problems",
-  description: "A LeetCode-style platform for practicing data structures and algorithms",
+  description: "A coding practice platform for data structures and algorithms",
 };
 
 export default function RootLayout({

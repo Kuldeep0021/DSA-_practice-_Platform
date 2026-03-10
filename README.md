@@ -1,6 +1,6 @@
 # DSA Verse — Local Development
 
-This is a LeetCode-style practice platform built with Next.js, TypeScript, Tailwind and Firebase.
+This is a coding practice platform built with Next.js, TypeScript, Tailwind and Firebase.
 
 Quick start
 
