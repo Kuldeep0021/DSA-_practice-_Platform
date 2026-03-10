@@ -243,6 +243,217 @@ const pyMedianSortedArrays = `def solution(nums1, nums2):
 
     return 0.0`;
 
+const jsSearchRotated = `function solution(nums, target) {
+  let left = 0;
+  let right = nums.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+
+    if (nums[mid] === target) {
+      return mid;
+    }
+
+    if (nums[left] <= nums[mid]) {
+      if (nums[left] <= target && target < nums[mid]) {
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
+    } else {
+      if (nums[mid] < target && target <= nums[right]) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+  }
+
+  return -1;
+}`;
+
+const pySearchRotated = `def solution(nums, target):
+    left = 0
+    right = len(nums) - 1
+
+    while left <= right:
+        mid = (left + right) // 2
+
+        if nums[mid] == target:
+            return mid
+
+        if nums[left] <= nums[mid]:
+            if nums[left] <= target < nums[mid]:
+                right = mid - 1
+            else:
+                left = mid + 1
+        else:
+            if nums[mid] < target <= nums[right]:
+                left = mid + 1
+            else:
+                right = mid - 1
+
+    return -1`;
+
+const jsSearchRange = `function solution(nums, target) {
+  const lowerBound = (findFirst) => {
+    let left = 0;
+    let right = nums.length - 1;
+    let answer = -1;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      if (nums[mid] > target || (findFirst && nums[mid] === target)) {
+        right = mid - 1;
+      } else {
+        left = mid + 1;
+      }
+      if (nums[mid] === target) {
+        answer = mid;
+      }
+    }
+
+    return answer;
+  };
+
+  return [lowerBound(true), lowerBound(false)];
+}`;
+
+const pySearchRange = `def solution(nums, target):
+    def boundary(find_first):
+        left = 0
+        right = len(nums) - 1
+        answer = -1
+
+        while left <= right:
+            mid = (left + right) // 2
+            if nums[mid] > target or (find_first and nums[mid] == target):
+                right = mid - 1
+            else:
+                left = mid + 1
+
+            if nums[mid] == target:
+                answer = mid
+
+        return answer
+
+    return [boundary(True), boundary(False)]`;
+
+const jsMinWindow = `function solution(s, t) {
+  if (!s || !t || t.length > s.length) {
+    return "";
+  }
+
+  const need = new Map();
+  for (const ch of t) {
+    need.set(ch, (need.get(ch) || 0) + 1);
+  }
+
+  let required = need.size;
+  let left = 0;
+  let minLen = Infinity;
+  let start = 0;
+
+  const window = new Map();
+
+  for (let right = 0; right < s.length; right += 1) {
+    const ch = s[right];
+    window.set(ch, (window.get(ch) || 0) + 1);
+
+    if (need.has(ch) && window.get(ch) === need.get(ch)) {
+      required -= 1;
+    }
+
+    while (required === 0) {
+      if (right - left + 1 < minLen) {
+        minLen = right - left + 1;
+        start = left;
+      }
+
+      const leftCh = s[left];
+      window.set(leftCh, window.get(leftCh) - 1);
+      if (need.has(leftCh) && window.get(leftCh) < need.get(leftCh)) {
+        required += 1;
+      }
+      left += 1;
+    }
+  }
+
+  return minLen === Infinity ? "" : s.slice(start, start + minLen);
+}`;
+
+const pyMinWindow = `def solution(s, t):
+    if not s or not t or len(t) > len(s):
+        return ""
+
+    need = {}
+    for ch in t:
+        need[ch] = need.get(ch, 0) + 1
+
+    required = len(need)
+    left = 0
+    start = 0
+    min_len = float("inf")
+    window = {}
+
+    for right, ch in enumerate(s):
+        window[ch] = window.get(ch, 0) + 1
+
+        if ch in need and window[ch] == need[ch]:
+            required -= 1
+
+        while required == 0:
+            if right - left + 1 < min_len:
+                min_len = right - left + 1
+                start = left
+
+            left_ch = s[left]
+            window[left_ch] -= 1
+            if left_ch in need and window[left_ch] < need[left_ch]:
+                required += 1
+            left += 1
+
+    if min_len == float("inf"):
+        return ""
+    return s[start:start + min_len]`;
+
+const jsLargestRectangle = `function solution(heights) {
+  const stack = [];
+  let maxArea = 0;
+
+  for (let i = 0; i <= heights.length; i += 1) {
+    const currentHeight = i === heights.length ? 0 : heights[i];
+
+    while (stack.length > 0 && currentHeight < heights[stack[stack.length - 1]]) {
+      const top = stack.pop();
+      const height = heights[top];
+      const width = stack.length === 0 ? i : i - stack[stack.length - 1] - 1;
+      maxArea = Math.max(maxArea, height * width);
+    }
+
+    stack.push(i);
+  }
+
+  return maxArea;
+}`;
+
+const pyLargestRectangle = `def solution(heights):
+    stack = []
+    max_area = 0
+
+    for i in range(len(heights) + 1):
+        current_height = 0 if i == len(heights) else heights[i]
+
+        while stack and current_height < heights[stack[-1]]:
+            top = stack.pop()
+            height = heights[top]
+            width = i if not stack else i - stack[-1] - 1
+            max_area = max(max_area, height * width)
+
+        stack.append(i)
+
+    return max_area`;
+
 export const SAMPLE_PROBLEMS: SeedProblem[] = [
   {
     title: "Two Sum",
@@ -472,6 +683,130 @@ export const SAMPLE_PROBLEMS: SeedProblem[] = [
       { input: [[1, 3], [2]], output: 2 },
       { input: [[1, 2], [3, 4]], output: 2.5 },
       { input: [[0, 0], [0, 0]], output: 0 },
+    ],
+  },
+  {
+    title: "Search in Rotated Sorted Array",
+    description:
+      "There is an integer array nums sorted in ascending order and rotated at an unknown pivot. Given nums and target, return the index of target if it is in nums, or -1 otherwise.",
+    difficulty: "Medium",
+    tags: ["array", "binary-search"],
+    examples: [
+      {
+        input: "nums = [4,5,6,7,0,1,2], target = 0",
+        output: "4",
+      },
+      {
+        input: "nums = [4,5,6,7,0,1,2], target = 3",
+        output: "-1",
+      },
+    ],
+    constraints: [
+      "1 <= nums.length <= 5000",
+      "-10^4 <= nums[i] <= 10^4",
+      "All values of nums are unique.",
+      "nums is an ascending array rotated at some pivot.",
+    ],
+    starterCode: {
+      javascript: jsSearchRotated,
+      python: pySearchRotated,
+    },
+    testCases: [
+      { input: [[4, 5, 6, 7, 0, 1, 2], 0], output: 4 },
+      { input: [[4, 5, 6, 7, 0, 1, 2], 3], output: -1 },
+      { input: [[1], 0], output: -1 },
+    ],
+  },
+  {
+    title: "Find First and Last Position of Element in Sorted Array",
+    description:
+      "Given an array of integers nums sorted in non-decreasing order, find the starting and ending position of a given target value.",
+    difficulty: "Medium",
+    tags: ["array", "binary-search"],
+    examples: [
+      {
+        input: "nums = [5,7,7,8,8,10], target = 8",
+        output: "[3,4]",
+      },
+      {
+        input: "nums = [5,7,7,8,8,10], target = 6",
+        output: "[-1,-1]",
+      },
+    ],
+    constraints: [
+      "0 <= nums.length <= 10^5",
+      "-10^9 <= nums[i] <= 10^9",
+      "nums is sorted in non-decreasing order.",
+      "-10^9 <= target <= 10^9",
+    ],
+    starterCode: {
+      javascript: jsSearchRange,
+      python: pySearchRange,
+    },
+    testCases: [
+      { input: [[5, 7, 7, 8, 8, 10], 8], output: [3, 4] },
+      { input: [[5, 7, 7, 8, 8, 10], 6], output: [-1, -1] },
+      { input: [[], 0], output: [-1, -1] },
+    ],
+  },
+  {
+    title: "Minimum Window Substring",
+    description:
+      "Given two strings s and t, return the minimum window substring of s such that every character in t is included in the window.",
+    difficulty: "Hard",
+    tags: ["string", "sliding-window", "hashmap"],
+    examples: [
+      {
+        input: 's = "ADOBECODEBANC", t = "ABC"',
+        output: '"BANC"',
+      },
+      {
+        input: 's = "a", t = "aa"',
+        output: '""',
+      },
+    ],
+    constraints: [
+      "1 <= s.length, t.length <= 10^5",
+      "s and t consist of uppercase and lowercase English letters.",
+    ],
+    starterCode: {
+      javascript: jsMinWindow,
+      python: pyMinWindow,
+    },
+    testCases: [
+      { input: ["ADOBECODEBANC", "ABC"], output: "BANC" },
+      { input: ["a", "a"], output: "a" },
+      { input: ["a", "aa"], output: "" },
+    ],
+  },
+  {
+    title: "Largest Rectangle in Histogram",
+    description:
+      "Given an array of integers heights representing the histogram's bar height where the width of each bar is 1, return the area of the largest rectangle in the histogram.",
+    difficulty: "Hard",
+    tags: ["array", "stack", "monotonic-stack"],
+    examples: [
+      {
+        input: "heights = [2,1,5,6,2,3]",
+        output: "10",
+      },
+      {
+        input: "heights = [2,4]",
+        output: "4",
+      },
+    ],
+    constraints: [
+      "1 <= heights.length <= 10^5",
+      "0 <= heights[i] <= 10^4",
+    ],
+    starterCode: {
+      javascript: jsLargestRectangle,
+      python: pyLargestRectangle,
+    },
+    testCases: [
+      { input: [[2, 1, 5, 6, 2, 3]], output: 10 },
+      { input: [[2, 4]], output: 4 },
+      { input: [[2, 1, 2]], output: 3 },
     ],
   },
 ];
