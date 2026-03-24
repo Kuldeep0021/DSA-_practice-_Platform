@@ -5,7 +5,7 @@ export default function Home() {
     <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
       <section className="max-w-3xl w-full surface rounded-xl p-10">
         <p className="text-sm uppercase tracking-wider text-cyan-300 mb-3">DSA Verse</p>
-        <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
+        <h1 className="text-6xl md:text-7xl font-bold leading-tight mb-4">
           Practice coding interview problems with live execution.
         </h1>
         <p className="text-gray-300 mb-8">

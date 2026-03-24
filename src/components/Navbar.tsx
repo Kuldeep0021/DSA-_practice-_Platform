@@ -30,10 +30,15 @@ export default function Navbar() {
     }
   };
 
-  const linkClassName = (href: string) =>
-    `${
-      pathname === href ? "text-white" : "muted"
+  const getLinkClassName = (href: string, isButton: boolean = false) => {
+    if (isButton) {
+      return `btn-accent px-4 py-2 rounded font-semibold`;
+    }
+    const isActive = pathname === href;
+    return `${
+      isActive ? "text-white" : "muted"
     } text-glow-cyan transition-all duration-300`;
+  };
 
   const isAuthenticated = Boolean(user);
 
@@ -42,16 +47,19 @@ export default function Navbar() {
       <nav className="flex justify-between items-center p-4 border-b border-white/10">
         <Link
           href="/"
-          className="text-2xl font-extrabold"
-          style={{ color: "var(--accent)" }}
+          className="text-3xl font-extrabold text-glow-cyan"
+          style={{ color: "var(--accent-2)" }}
         >
           DSA Verse
         </Link>
         <div className="flex items-center gap-4">
-          <Link href="/login" className={linkClassName("/login")}>
+          <Link
+            href="/login"
+            className="px-4 py-2 rounded border border-white/20 hover:border-white/40"
+          >
             Login
           </Link>
-          <Link href="/signup" className={linkClassName("/signup")}>
+          <Link href="/signup" className="btn-accent px-4 py-2 rounded font-semibold">
             Signup
           </Link>
         </div>
@@ -65,28 +73,28 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard"
-            className="text-2xl font-extrabold"
-            style={{ color: "var(--accent)" }}
+            className="text-3xl font-extrabold text-glow-cyan"
+            style={{ color: "var(--accent-2)" }}
           >
-            <span className="blink-slow px-2 rounded">DSA Verse</span>
+            DSA Verse
           </Link>
           <span className="muted text-sm">Practice and Learn</span>
         </div>
 
         <div className="flex flex-wrap gap-4 items-center">
-          <Link href="/problems" className={linkClassName("/problems")}>
+          <Link href="/problems" className={getLinkClassName("/problems", true)}>
             Problems
           </Link>
-          <Link href="/submissions" className={linkClassName("/submissions")}>
+          <Link href="/submissions" className={getLinkClassName("/submissions", true)}>
             Submissions
           </Link>
-          <Link href="/dashboard" className={linkClassName("/dashboard")}>
+          <Link href="/dashboard" className={getLinkClassName("/dashboard", true)}>
             Dashboard
           </Link>
 
           <button
             onClick={handleLogout}
-            className="btn-accent px-3 py-1 rounded transition-all duration-300"
+            className="btn-accent px-3 py-1 rounded font-semibold"
           >
             Logout
           </button>

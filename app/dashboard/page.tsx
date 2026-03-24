@@ -37,17 +37,17 @@ export default function Dashboard() {
           <p className="text-gray-300 mb-8">Logged in as: {userEmail}</p>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <Link href="/problems" className="surface rounded p-4 hover:border-white/20 transition">
+            <Link href="/problems" className="surface rounded p-4 interactive-card">
               <h2 className="font-semibold mb-2">Solve Problems</h2>
               <p className="text-sm muted">Browse the full problem list and start coding.</p>
             </Link>
 
-            <Link href="/submissions" className="surface rounded p-4 hover:border-white/20 transition">
+            <Link href="/submissions" className="surface rounded p-4 interactive-card">
               <h2 className="font-semibold mb-2">Submission History</h2>
               <p className="text-sm muted">Review your accepted and failed submissions.</p>
             </Link>
 
-            <Link href="/admin/problems" className="surface rounded p-4 hover:border-white/20 transition">
+            <Link href="/admin/problems" className="surface rounded p-4 interactive-card">
               <h2 className="font-semibold mb-2">Admin Problems</h2>
               <p className="text-sm muted">Create and manage problems if you are an admin.</p>
             </Link>
