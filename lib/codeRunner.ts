@@ -25,6 +25,8 @@ function readString(record: Record<string, unknown>, key: string): string {
 function normalizeLanguage(language: string): SupportedLanguage | null {
   if (language === "javascript") return "javascript";
   if (language === "python") return "python";
+  if (language === "java") return "java";
+  if (language === "cpp") return "cpp";
   return null;
 }
 
@@ -65,6 +67,90 @@ function makePythonWrapper(code: string, input: unknown[]): string {
   ].join("\n");
 }
 
+function makeJavaWrapper(code: string, input: unknown[]): string {
+  const encodedInput = Buffer.from(JSON.stringify(input), "utf8").toString("base64");
+  return `
+import java.util.*;
+import java.io.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+${code}
+
+class Main {
+    public static void main(String[] args) {
+        try {
+            byte[] decodedBytes = Base64.getDecoder().decode("${encodedInput}");
+            String decodedString = new String(decodedBytes);
+            JSONArray inputs = new JSONArray(decodedString);
+            
+            Solution sol = new Solution();
+            // This is a simplified way to pass arguments.
+            // It might need adjustments based on the problem's specific input types.
+            Object[] argsArray = new Object[inputs.length()];
+            for (int i = 0; i < inputs.length(); i++) {
+                argsArray[i] = inputs.get(i);
+            }
+
+            Object result = sol.solution(argsArray);
+
+            System.out.println(new JSONObject().put("result", result).toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+}`;
+}
+
+function makeCppWrapper(code: string, input: unknown[]): string {
+    const encodedInput = Buffer.from(JSON.stringify(input), "utf8").toString("base64");
+    // Using nlohmann/json for C++ JSON parsing, assuming it's available in Piston.
+    return `
+#include <iostream>
+#include <vector>
+#include <string>
+#include "nlohmann/json.hpp"
+
+// Base64 decoding function
+std::string base64_decode(const std::string &in) {
+    std::string out;
+    std::vector<int> T(256,-1);
+    for (int i=0; i<64; i++) T["ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"[i]] = i;
+
+    int val=0, valb=-8;
+    for (char c : in) {
+        if (T[c] == -1) break;
+        val = (val << 6) + T[c];
+        valb += 6;
+        if (valb >= 0) {
+            out.push_back(char((val>>valb)&0xFF));
+            valb -= 8;
+        }
+    }
+    return out;
+}
+
+${code}
+
+int main() {
+    std::string encoded_input = "${encodedInput}";
+    std::string decoded_input = base64_decode(encoded_input);
+    
+    try {
+        nlohmann::json input_json = nlohmann::json::parse(decoded_input);
+        // solution() function needs to be able to handle nlohmann::json
+        // This is a simplification. The user might need to adapt their solution signature.
+        solution(input_json);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
+    return 0;
+}`;
+}
+
+
 function parseStdout(stdout: string): { parsed: unknown; parseError?: string } {
   const lines = stdout
     .split(/\r?\n/)
@@ -77,7 +163,11 @@ function parseStdout(stdout: string): { parsed: unknown; parseError?: string } {
 
   const candidate = lines[lines.length - 1];
   try {
-    return { parsed: JSON.parse(candidate) as unknown };
+    const parsedJson = JSON.parse(candidate) as unknown;
+    if(isRecord(parsedJson) && 'result' in parsedJson) {
+        return { parsed: parsedJson.result };
+    }
+    return { parsed: parsedJson };
   } catch {
     return { parsed: null, parseError: "Output is not valid JSON." };
   }
@@ -126,15 +216,42 @@ async function executeSingle(
   code: string,
   input: unknown[]
 ): Promise<RunnerOutput> {
-  const source =
-    language === "javascript"
-      ? makeJavascriptWrapper(code, input)
-      : makePythonWrapper(code, input);
+  let source = '';
+  let pistonLanguage = '';
+
+  switch (language) {
+    case "javascript":
+      source = makeJavascriptWrapper(code, input);
+      pistonLanguage = 'javascript';
+      break;
+    case "python":
+      source = makePythonWrapper(code, input);
+      pistonLanguage = 'python';
+      break;
+    case "java":
+      source = makeJavaWrapper(code, input);
+      pistonLanguage = 'java';
+      break;
+    case "cpp":
+      source = makeCppWrapper(code, input);
+      pistonLanguage = 'cpp';
+      break;
+  }
 
   const payload = {
-    language: language === "javascript" ? "javascript" : "python3",
-    source,
+    language: pistonLanguage,
+    version: "10.2.0", // for cpp, can be adapted for others
+    files: [{ content: source }],
   };
+  
+  if (language === 'java') {
+      payload.version = '15.0.2';
+  } else if (language === 'python') {
+      payload.version = '3.10.0';
+  } else if (language === 'javascript') {
+      payload.version = '18.15.0';
+  }
+
 
   try {
     const response = await fetch(PISTON_URL, {
