@@ -1,6 +1,6 @@
 export type Difficulty = "Easy" | "Medium" | "Hard";
 
-export type SupportedLanguage = "javascript" | "python";
+export type SupportedLanguage = "javascript" | "python" | "java" | "cpp";
 
 export interface ProblemExample {
   input: string;
@@ -21,7 +21,7 @@ export interface Problem {
   tags: string[];
   examples: ProblemExample[];
   constraints: string[];
-  starterCode: Partial<Record<SupportedLanguage, string>>;
+  starterCode: Record<SupportedLanguage, string>;
   testCases: TestCase[];
   createdAt?: unknown;
 }

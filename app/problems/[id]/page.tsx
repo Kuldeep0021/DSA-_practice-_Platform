@@ -26,11 +26,30 @@ const DEFAULT_STARTER_CODE: Record<SupportedLanguage, string> = {
   python: `def solution(*args):
     # Write your solution here.
     return None`,
+  java: `import java.util.*;
+
+class Solution {
+    public Object solution(Object... args) {
+        // Write your solution here.
+        return null;
+    }
+}`,
+  cpp: `#include <iostream>
+#include <vector>
+#include <string>
+
+// Note: The return type and signature will vary per problem.
+// You may need to change 'void' to 'int', 'vector<int>', etc.
+void solution() {
+    // Write your solution here.
+}`,
 };
 
 const LANGUAGE_OPTIONS: Array<{ value: SupportedLanguage; label: string }> = [
   { value: "javascript", label: "JavaScript" },
   { value: "python", label: "Python" },
+  { value: "java", label: "Java" },
+  { value: "cpp", label: "C++" },
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -55,6 +74,10 @@ function getLanguageStorageKey(problemId: string): string {
 
 function getCodeStorageKey(problemId: string, language: SupportedLanguage): string {
   return `editor_code_${problemId}_${language}`;
+}
+
+function isSupportedLanguage(value: string | null): value is SupportedLanguage {
+  return value === "javascript" || value === "python" || value === "java" || value === "cpp";
 }
 
 interface SubmitResponse {
@@ -111,10 +134,7 @@ export default function ProblemDetailPage() {
         setProblem(payload.problem);
 
         const savedLanguage = localStorage.getItem(getLanguageStorageKey(problemId));
-        const selectedLanguage =
-          savedLanguage === "python" || savedLanguage === "javascript"
-            ? savedLanguage
-            : "javascript";
+        const selectedLanguage = isSupportedLanguage(savedLanguage) ? savedLanguage : "javascript";
 
         const savedCode = localStorage.getItem(
           getCodeStorageKey(problemId, selectedLanguage)
