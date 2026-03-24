@@ -132,3 +132,64 @@ body {
   border-radius: 6px;
   font-weight: 600;
 }
+
+/* === Global Style Overhaul: Neon Glow === */
+
+/* --- Universal Transitions --- */
+button,
+.btn-accent,
+a[class*="btn-"],
+input,
+textarea {
+  transition: all 0.3s ease-in-out;
+}
+
+/* --- Base Input Styling --- */
+input,
+textarea {
+  background-color: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  color: var(--foreground);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+
+/* --- Neon Glow Effect on Focus/Hover --- */
+
+/* Buttons (Solid and Outlined) */
+.btn-accent:hover,
+.btn-accent:focus,
+a[class*="btn-"]:hover,
+a[class*="btn-"]:focus,
+button:hover,
+button:focus,
+a.rounded.border:hover,
+a.rounded.border:focus {
+  transform: translateY(-2px);
+  border-color: var(--accent-2);
+  box-shadow: 0 0 5px rgba(6, 182, 212, 0.6),
+              0 0 10px rgba(6, 182, 212, 0.4),
+              0 0 20px rgba(6, 182, 212, 0.2);
+}
+
+/* Input Fields */
+input:focus,
+textarea:focus {
+  color: #ffffff;
+  border-color: var(--accent-2);
+  box-shadow: 0 0 5px rgba(6, 182, 212, 0.6),
+              0 0 10px rgba(6, 182, 212, 0.4),
+              0 0 20px rgba(6, 182, 212, 0.2);
+  outline: none;
+}
+
+/* --- Neon Text Glow for Navbar --- */
+.text-glow-cyan:hover {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
+}

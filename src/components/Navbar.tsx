@@ -31,14 +31,20 @@ export default function Navbar() {
   };
 
   const linkClassName = (href: string) =>
-    `${pathname === href ? "text-white" : "muted hover:text-white"} transition-colors`;
+    `${
+      pathname === href ? "text-white" : "muted"
+    } text-glow-cyan transition-all duration-300`;
 
   const isAuthenticated = Boolean(user);
 
   if (!isAuthenticated) {
     return (
       <nav className="flex justify-between items-center p-4 border-b border-white/10">
-        <Link href="/" className="text-2xl font-extrabold" style={{ color: "var(--accent)" }}>
+        <Link
+          href="/"
+          className="text-2xl font-extrabold"
+          style={{ color: "var(--accent)" }}
+        >
           DSA Verse
         </Link>
         <div className="flex items-center gap-4">
@@ -78,13 +84,18 @@ export default function Navbar() {
             Dashboard
           </Link>
 
-          <button onClick={handleLogout} className="btn-accent px-3 py-1 rounded">
+          <button
+            onClick={handleLogout}
+            className="btn-accent px-3 py-1 rounded transition-all duration-300"
+          >
             Logout
           </button>
         </div>
       </div>
 
-      {user?.email && <p className="muted text-xs mt-2">Signed in as {user.email}</p>}
+      {user?.email && (
+        <p className="muted text-xs mt-2">Signed in as {user.email}</p>
+      )}
       {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
     </nav>
   );
