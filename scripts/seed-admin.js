@@ -163,6 +163,20 @@ async function main() {
       },
     ];
 
+    console.log('Deleting existing problems...');
+    const problemsCollection = firestore.collection('problems');
+    const snapshot = await problemsCollection.get();
+    if (!snapshot.empty) {
+      const batch = firestore.batch();
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      console.log(`Deleted ${snapshot.size} problems.`);
+    } else {
+      console.log('No existing problems to delete.');
+    }
+
     console.log('Seeding problems...');
     for (const p of problems) {
       try {
