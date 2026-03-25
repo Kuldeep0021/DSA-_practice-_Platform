@@ -92,6 +92,9 @@ export default function Navbar() {
           <Link href="/submissions" className={getLinkClassName("/submissions", true)}>
             Submissions
           </Link>
+          <Link href="/my-list" className={getLinkClassName("/my-list", true)}>
+            My List
+          </Link>
           <Link href="/dashboard" className={getLinkClassName("/dashboard", true)}>
             Dashboard
           </Link>
@@ -112,3 +115,4 @@ export default function Navbar() {
     </nav>
   );
 }
+
