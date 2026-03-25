@@ -39,6 +39,28 @@ function buildExecutionFailureResult(
   };
 }
 
+function sanitizeForFirestore<T>(value: T): T {
+  if (value === undefined) {
+    return null as T;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForFirestore(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const sanitizedRecord: Record<string, unknown> = {};
+
+    for (const [key, fieldValue] of Object.entries(record)) {
+      sanitizedRecord[key] = sanitizeForFirestore(fieldValue);
+    }
+
+    return sanitizedRecord as T;
+  }
+
+  return value;
+}
 export async function POST(request: Request) {
   try {
     const user = await authenticateRequest(request);
@@ -90,6 +112,7 @@ export async function POST(request: Request) {
     const status = deriveSubmissionStatus(runResult);
 
     const admin = getAdmin();
+    const firestoreSafeResult = sanitizeForFirestore(runResult);
     const submissionRef = await db.collection("submissions").add({
       userId: user.uid,
       userEmail: user.email,
@@ -98,7 +121,7 @@ export async function POST(request: Request) {
       language,
       code,
       status,
-      result: runResult,
+      result: firestoreSafeResult,
       type: "submit",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -107,7 +130,7 @@ export async function POST(request: Request) {
       ok: true,
       submissionId: submissionRef.id,
       status,
-      result: runResult,
+      result: firestoreSafeResult,
     });
   } catch (error: unknown) {
     if (error instanceof RequestAuthError) {
@@ -120,3 +143,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
