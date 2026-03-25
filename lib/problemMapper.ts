@@ -8,7 +8,12 @@ import type {
 import { SAMPLE_PROBLEMS } from "@/lib/problemSamples";
 
 const DIFFICULTIES: Difficulty[] = ["Easy", "Medium", "Hard"];
-const SUPPORTED_LANGUAGES: SupportedLanguage[] = ["javascript", "python"];
+const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
+  "javascript",
+  "python",
+  "java",
+  "cpp",
+];
 const SAMPLE_TEST_CASES_BY_TITLE = new Map(
   SAMPLE_PROBLEMS.map((problem) => [problem.title.toLowerCase(), problem.testCases])
 );
@@ -39,12 +44,16 @@ function parseExamples(value: unknown): ProblemExample[] {
     .filter((item) => item.input.length > 0 || item.output.length > 0);
 }
 
-function parseStarterCode(
-  value: unknown
-): Partial<Record<SupportedLanguage, string>> {
-  if (!isRecord(value)) return {};
+function parseStarterCode(value: unknown): Record<SupportedLanguage, string> {
+  const starter: Record<SupportedLanguage, string> = {
+    javascript: "",
+    python: "",
+    java: "",
+    cpp: "",
+  };
 
-  const starter: Partial<Record<SupportedLanguage, string>> = {};
+  if (!isRecord(value)) return starter;
+
   for (const language of SUPPORTED_LANGUAGES) {
     const raw = value[language];
     if (typeof raw === "string" && raw.length > 0) {
