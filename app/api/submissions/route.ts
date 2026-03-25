@@ -38,6 +38,15 @@ function parseCaseResult(value: unknown): RunCaseResult | null {
 }
 
 function parseRunResult(value: unknown): RunResult {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parseRunResult(parsed);
+    } catch {
+      return { passedAll: false, results: [] };
+    }
+  }
+
   if (!isRecord(value) || typeof value.passedAll !== "boolean" || !Array.isArray(value.results)) {
     return { passedAll: false, results: [] };
   }
@@ -118,3 +127,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

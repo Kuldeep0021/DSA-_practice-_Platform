@@ -39,28 +39,46 @@ function buildExecutionFailureResult(
   };
 }
 
-function sanitizeForFirestore<T>(value: T): T {
-  if (value === undefined) {
-    return null as T;
+function sanitizeForFirestore(value: unknown): unknown {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+
+  if (typeof value === "function" || typeof value === "symbol") {
+    return null;
+  }
+
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    return null;
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => sanitizeForFirestore(item)) as T;
+    return value.map((item) => sanitizeForFirestore(item));
   }
 
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
+  if (isRecord(value)) {
     const sanitizedRecord: Record<string, unknown> = {};
-
-    for (const [key, fieldValue] of Object.entries(record)) {
+    for (const [key, fieldValue] of Object.entries(value)) {
       sanitizedRecord[key] = sanitizeForFirestore(fieldValue);
     }
-
-    return sanitizedRecord as T;
+    return sanitizedRecord;
   }
 
   return value;
 }
+
+function serializeRunResultForStorage(value: RunResult): string {
+  try {
+    return JSON.stringify(sanitizeForFirestore(value));
+  } catch {
+    return JSON.stringify({ passedAll: false, results: [] });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const user = await authenticateRequest(request);
@@ -112,7 +130,9 @@ export async function POST(request: Request) {
     const status = deriveSubmissionStatus(runResult);
 
     const admin = getAdmin();
-    const firestoreSafeResult = sanitizeForFirestore(runResult);
+    const firestoreSafeResult = sanitizeForFirestore(runResult) as RunResult;
+    const serializedRunResult = serializeRunResultForStorage(runResult);
+
     const submissionRef = await db.collection("submissions").add({
       userId: user.uid,
       userEmail: user.email,
@@ -121,7 +141,7 @@ export async function POST(request: Request) {
       language,
       code,
       status,
-      result: firestoreSafeResult,
+      result: serializedRunResult,
       type: "submit",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -143,4 +163,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
