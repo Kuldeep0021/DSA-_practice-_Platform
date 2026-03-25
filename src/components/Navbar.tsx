@@ -31,10 +31,14 @@ export default function Navbar() {
   };
 
   const getLinkClassName = (href: string, isButton: boolean = false) => {
+    const isActive = pathname === href || pathname.startsWith(`${href}/`);
+
     if (isButton) {
-      return `btn-accent px-4 py-2 rounded font-semibold`;
+      if (isActive) {
+        return "px-4 py-2 rounded font-semibold border border-cyan-300 bg-cyan-300 text-slate-950 shadow-[0_0_16px_rgba(34,211,238,0.35)]";
+      }
+      return "btn-accent px-4 py-2 rounded font-semibold border border-transparent";
     }
-    const isActive = pathname === href;
     return `${
       isActive ? "text-white" : "muted"
     } text-glow-cyan transition-all duration-300`;
@@ -44,15 +48,15 @@ export default function Navbar() {
 
   if (!isAuthenticated) {
     return (
-      <nav className="flex justify-between items-center p-4 border-b border-white/10">
+      <nav className="flex flex-wrap justify-between items-center p-4 gap-3 border-b border-white/10">
         <Link
           href="/"
-          className="text-3xl font-extrabold text-glow-cyan"
+          className="text-2xl sm:text-3xl font-extrabold text-glow-cyan"
           style={{ color: "var(--accent-2)" }}
         >
           DSA Verse
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link
             href="/login"
             className="px-4 py-2 rounded border border-white/20 hover:border-white/40"
@@ -73,15 +77,15 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard"
-            className="text-3xl font-extrabold text-glow-cyan"
+            className="text-2xl sm:text-3xl font-extrabold text-glow-cyan"
             style={{ color: "var(--accent-2)" }}
           >
             DSA Verse
           </Link>
-          <span className="muted text-sm">Practice and Learn</span>
+          <span className="muted text-sm hidden sm:inline">Practice and Learn</span>
         </div>
 
-        <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex flex-wrap gap-2 sm:gap-3 items-center justify-end">
           <Link href="/problems" className={getLinkClassName("/problems", true)}>
             Problems
           </Link>
@@ -94,7 +98,7 @@ export default function Navbar() {
 
           <button
             onClick={handleLogout}
-            className="btn-accent px-3 py-1 rounded font-semibold"
+            className="btn-accent px-4 py-2 rounded font-semibold border border-transparent"
           >
             Logout
           </button>
@@ -102,7 +106,7 @@ export default function Navbar() {
       </div>
 
       {user?.email && (
-        <p className="muted text-xs mt-2">Signed in as {user.email}</p>
+        <p className="muted text-xs mt-2 break-all">Signed in as {user.email}</p>
       )}
       {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
     </nav>

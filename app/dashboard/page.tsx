@@ -38,6 +38,50 @@ const EMPTY_STATS: DashboardStats = {
   },
 };
 
+const DIFFICULTY_STYLES: Record<
+  Difficulty,
+  { containerClassName: string; labelClassName: string }
+> = {
+  Easy: {
+    containerClassName: "bg-emerald-500/10 border border-emerald-400/30",
+    labelClassName: "text-emerald-400",
+  },
+  Medium: {
+    containerClassName: "bg-amber-500/10 border border-amber-400/30",
+    labelClassName: "text-amber-400",
+  },
+  Hard: {
+    containerClassName: "bg-rose-500/10 border border-rose-400/30",
+    labelClassName: "text-rose-400",
+  },
+};
+
+interface DashboardQuickLink {
+  href: string;
+  title: string;
+  description: string;
+  requiresAdmin?: boolean;
+}
+
+const DASHBOARD_QUICK_LINKS: DashboardQuickLink[] = [
+  {
+    href: "/problems",
+    title: "Solve Problems",
+    description: "Browse the full problem list and start coding.",
+  },
+  {
+    href: "/submissions",
+    title: "Submission History",
+    description: "Review your accepted and failed submissions.",
+  },
+  {
+    href: "/admin/problems",
+    title: "Admin Problems",
+    description: "Create and manage problems if you are an admin.",
+    requiresAdmin: true,
+  },
+];
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -187,7 +231,13 @@ export default function Dashboard() {
   const [statsError, setStatsError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isActive = true;
+    let requestVersion = 0;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      requestVersion += 1;
+      const currentRequestVersion = requestVersion;
+
       setUserEmail(user?.email ?? user?.uid ?? null);
       setAuthReady(true);
 
@@ -204,6 +254,11 @@ export default function Dashboard() {
 
         try {
           const token = await user.getIdToken();
+
+          if (!isActive || currentRequestVersion !== requestVersion) {
+            return;
+          }
+
           const [submissionsResponse, problemsResponse] = await Promise.all([
             fetch("/api/submissions", {
               headers: { Authorization: `Bearer ${token}` },
@@ -229,20 +284,41 @@ export default function Dashboard() {
             throw new Error(problemsPayload.error || "Failed to load problems.");
           }
 
+          if (!isActive || currentRequestVersion !== requestVersion) {
+            return;
+          }
+
           const parsedSubmissions = parseSubmissionList(submissionsPayload.submissions);
           const parsedProblems = parseProblemList(problemsPayload.problems);
           setStats(buildDashboardStats(parsedSubmissions, parsedProblems));
         } catch (error: unknown) {
+          if (!isActive || currentRequestVersion !== requestVersion) {
+            return;
+          }
           setStats(EMPTY_STATS);
           setStatsError(getErrorMessage(error, "Failed to load dashboard stats."));
         } finally {
+          if (!isActive || currentRequestVersion !== requestVersion) {
+            return;
+          }
           setStatsLoading(false);
         }
       })();
     });
 
-    return () => unsubscribe();
+    return () => {
+      isActive = false;
+      unsubscribe();
+    };
   }, []);
+
+  const adminEmail = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || "").trim().toLowerCase();
+  const normalizedUserEmail = (userEmail || "").trim().toLowerCase();
+  const canAdmin = normalizedUserEmail.length > 0 && normalizedUserEmail === adminEmail;
+
+  const visibleQuickLinks = DASHBOARD_QUICK_LINKS.filter(
+    (link) => !link.requiresAdmin || canAdmin
+  );
 
   const totalSolvedLabel = statsLoading
     ? "-- / --"
@@ -261,85 +337,65 @@ export default function Dashboard() {
     <ProtectedRoute>
       <>
         <Navbar />
-        <div className="min-h-screen bg-black text-white px-8 py-12">
-          <h1 className="text-3xl font-bold mb-3">Welcome to DSA Verse</h1>
-          <p className="text-gray-300 mb-8">Logged in as: {userEmail}</p>
+        <div className="min-h-screen bg-black text-white px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2">Welcome to DSA Verse</h1>
+          <p className="text-gray-300 text-sm sm:text-base mb-6 sm:mb-8 break-all">
+            Logged in as: {userEmail}
+          </p>
 
-          <div className="surface rounded-lg p-6 interactive-card mb-8 border border-gray-800 bg-gray-900/50">
-            <div className="grid md:grid-cols-3 items-center gap-8">
-              <div className="md:col-span-2">
+          <div className="surface rounded-xl p-5 sm:p-6 interactive-card mb-8 border border-gray-800 bg-gray-900/50">
+            <div className="grid lg:grid-cols-3 items-center gap-6">
+              <div className="lg:col-span-2">
                 <h2 className="font-semibold text-xl mb-4">Progress Snapshot</h2>
-                <div className="flex items-baseline space-x-8">
+                <div className="flex flex-col sm:flex-row sm:items-end gap-6 sm:gap-10">
                   <div>
-                    <p className="text-5xl font-bold">{totalSolvedLabel}</p>
+                    <p className="text-4xl sm:text-5xl font-bold">{totalSolvedLabel}</p>
                     <p className="text-sm text-gray-400">Total Solved</p>
                   </div>
                   <div>
-                    <p className="text-4xl">Streak {dayStreakLabel}</p>
+                    <p className="text-3xl sm:text-4xl">Streak {dayStreakLabel}</p>
                     <p className="text-sm text-gray-400">Day Streak</p>
                   </div>
                 </div>
-                {statsError && <p className="mt-3 text-sm text-rose-300">{statsError}</p>}
+                {statsError && (
+                  <p className="mt-3 text-sm text-rose-300" role="status" aria-live="polite">
+                    {statsError}
+                  </p>
+                )}
               </div>
 
-              <div className="mt-6 md:mt-0">
+              <div className="mt-2 lg:mt-0">
                 <div className="flex flex-col space-y-2">
-                  <div
-                    className="px-3 py-1.5 text-sm font-semibold rounded-lg flex justify-between items-center"
-                    style={{
-                      backgroundColor: "rgba(34, 197, 94, 0.1)",
-                      border: "1px solid rgba(34, 197, 94, 0.3)",
-                    }}
-                  >
-                    <span style={{ color: "#22c55e" }}>Easy</span>
-                    <span className="text-gray-300">
-                      {statsLoading ? "--" : stats.difficultySolved.Easy} Solved
-                    </span>
-                  </div>
-                  <div
-                    className="px-3 py-1.5 text-sm font-semibold rounded-lg flex justify-between items-center"
-                    style={{
-                      backgroundColor: "rgba(234, 179, 8, 0.1)",
-                      border: "1px solid rgba(234, 179, 8, 0.3)",
-                    }}
-                  >
-                    <span style={{ color: "#eab308" }}>Medium</span>
-                    <span className="text-gray-300">
-                      {statsLoading ? "--" : stats.difficultySolved.Medium} Solved
-                    </span>
-                  </div>
-                  <div
-                    className="px-3 py-1.5 text-sm font-semibold rounded-lg flex justify-between items-center"
-                    style={{
-                      backgroundColor: "rgba(239, 68, 68, 0.1)",
-                      border: "1px solid rgba(239, 68, 68, 0.3)",
-                    }}
-                  >
-                    <span style={{ color: "#ef4444" }}>Hard</span>
-                    <span className="text-gray-300">
-                      {statsLoading ? "--" : stats.difficultySolved.Hard} Solved
-                    </span>
-                  </div>
+                  {(["Easy", "Medium", "Hard"] as Difficulty[]).map((difficulty) => {
+                    const style = DIFFICULTY_STYLES[difficulty];
+                    return (
+                      <div
+                        key={difficulty}
+                        className={`px-3 py-1.5 text-sm font-semibold rounded-lg flex justify-between items-center ${style.containerClassName}`}
+                      >
+                        <span className={style.labelClassName}>{difficulty}</span>
+                        <span className="text-gray-300">
+                          {statsLoading ? "--" : stats.difficultySolved[difficulty]} Solved
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <Link href="/problems" className="surface rounded p-4 interactive-card">
-              <h2 className="font-semibold mb-2">Solve Problems</h2>
-              <p className="text-sm muted">Browse the full problem list and start coding.</p>
-            </Link>
-
-            <Link href="/submissions" className="surface rounded p-4 interactive-card">
-              <h2 className="font-semibold mb-2">Submission History</h2>
-              <p className="text-sm muted">Review your accepted and failed submissions.</p>
-            </Link>
-
-            <Link href="/admin/problems" className="surface rounded p-4 interactive-card">
-              <h2 className="font-semibold mb-2">Admin Problems</h2>
-              <p className="text-sm muted">Create and manage problems if you are an admin.</p>
-            </Link>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {visibleQuickLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="surface rounded-lg p-4 sm:p-5 interactive-card"
+              >
+                <h2 className="font-semibold mb-2">{link.title}</h2>
+                <p className="text-sm muted">{link.description}</p>
+              </Link>
+            ))}
           </div>
         </div>
       </>
