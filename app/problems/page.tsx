@@ -4,19 +4,27 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/src/components/ProtectedRoute";
 import Navbar from "@/src/components/Navbar";
-import type { Problem } from "@/src/types/domain";
+import type { Difficulty, Problem } from "@/src/types/domain";
 import { getErrorMessage } from "@/src/utils/errors";
 import DifficultyBadge from "@/src/components/ui/DifficultyBadge";
 import SurfaceCard from "@/src/components/ui/SurfaceCard";
 
 type ProblemListItem = Omit<Problem, "testCases">;
+type DifficultyFilter = Difficulty | "";
+
+function toDifficultyFilter(value: string): DifficultyFilter {
+  if (value === "Easy" || value === "Medium" || value === "Hard") {
+    return value;
+  }
+  return "";
+}
 
 export default function ProblemsPage() {
   const [problems, setProblems] = useState<ProblemListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [queryText, setQueryText] = useState("");
-  const [difficultyFilter, setDifficultyFilter] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,6 +84,38 @@ export default function ProblemsPage() {
     { total: 0, Easy: 0, Medium: 0, Hard: 0 } as Record<"total" | "Easy" | "Medium" | "Hard", number>
   );
 
+  const difficultySummaryCards: Array<{
+    value: DifficultyFilter;
+    label: "Total" | Difficulty;
+    count: number;
+    labelClassName: string;
+  }> = [
+    {
+      value: "",
+      label: "Total",
+      count: stats.total,
+      labelClassName: "text-slate-400",
+    },
+    {
+      value: "Easy",
+      label: "Easy",
+      count: stats.Easy,
+      labelClassName: "text-emerald-300",
+    },
+    {
+      value: "Medium",
+      label: "Medium",
+      count: stats.Medium,
+      labelClassName: "text-amber-300",
+    },
+    {
+      value: "Hard",
+      label: "Hard",
+      count: stats.Hard,
+      labelClassName: "text-rose-300",
+    },
+  ];
+
   const sortedProblems = [...visibleProblems].sort((a, b) => {
     const order = { Easy: 1, Medium: 2, Hard: 3 };
     const aOrder = order[a.difficulty];
@@ -101,22 +141,31 @@ export default function ProblemsPage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-4">
-              <SurfaceCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Total</p>
-                <p className="mt-2 text-2xl font-semibold">{stats.total}</p>
-              </SurfaceCard>
-              <SurfaceCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-emerald-300">Easy</p>
-                <p className="mt-2 text-2xl font-semibold">{stats.Easy}</p>
-              </SurfaceCard>
-              <SurfaceCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-amber-300">Medium</p>
-                <p className="mt-2 text-2xl font-semibold">{stats.Medium}</p>
-              </SurfaceCard>
-              <SurfaceCard className="p-4">
-                <p className="text-xs uppercase tracking-wide text-rose-300">Hard</p>
-                <p className="mt-2 text-2xl font-semibold">{stats.Hard}</p>
-              </SurfaceCard>
+              {difficultySummaryCards.map((card) => {
+                const isActive = difficultyFilter === card.value;
+                return (
+                  <button
+                    key={card.label}
+                    type="button"
+                    onClick={() => setDifficultyFilter(card.value)}
+                    aria-pressed={isActive}
+                    className="text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+                  >
+                    <SurfaceCard
+                      className={`p-4 transition ${
+                        isActive
+                          ? "border-cyan-300/70 shadow-[0_0_18px_rgba(34,211,238,0.25)]"
+                          : "hover:border-slate-600"
+                      }`}
+                    >
+                      <p className={`text-xs uppercase tracking-wide ${card.labelClassName}`}>
+                        {card.label}
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold">{card.count}</p>
+                    </SurfaceCard>
+                  </button>
+                );
+              })}
             </div>
 
             <SurfaceCard className="p-4 md:p-5">
@@ -131,7 +180,7 @@ export default function ProblemsPage() {
 
                   <select
                     value={difficultyFilter}
-                    onChange={(event) => setDifficultyFilter(event.target.value)}
+                    onChange={(event) => setDifficultyFilter(toDifficultyFilter(event.target.value))}
                     className="rounded-lg border border-slate-700 bg-[#11151d] px-3 py-2 text-slate-100 outline-none focus:border-amber-400/80"
                   >
                     <option value="">All difficulties</option>
