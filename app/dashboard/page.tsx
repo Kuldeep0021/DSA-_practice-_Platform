@@ -38,21 +38,26 @@ const EMPTY_STATS: DashboardStats = {
   },
 };
 
-const DIFFICULTY_STYLES: Record<
+const NEON_CYAN = "#22d3ee";
+
+const DIFFICULTY_THEME: Record<
   Difficulty,
-  { containerClassName: string; labelClassName: string }
+  { color: string; bg: string; border: string }
 > = {
   Easy: {
-    containerClassName: "bg-emerald-500/10 border border-emerald-400/30",
-    labelClassName: "text-emerald-400",
+    color: "#10b981",
+    bg: "rgba(16, 185, 129, 0.12)",
+    border: "rgba(16, 185, 129, 0.45)",
   },
   Medium: {
-    containerClassName: "bg-amber-500/10 border border-amber-400/30",
-    labelClassName: "text-amber-400",
+    color: "#f59e0b",
+    bg: "rgba(245, 158, 11, 0.12)",
+    border: "rgba(245, 158, 11, 0.45)",
   },
   Hard: {
-    containerClassName: "bg-rose-500/10 border border-rose-400/30",
-    labelClassName: "text-rose-400",
+    color: "#ef4444",
+    bg: "rgba(239, 68, 68, 0.12)",
+    border: "rgba(239, 68, 68, 0.45)",
   },
 };
 
@@ -223,6 +228,91 @@ function buildDashboardStats(
   };
 }
 
+function DifficultyDoughnutChart({
+  difficultySolved,
+  loading,
+}: {
+  difficultySolved: Record<Difficulty, number>;
+  loading: boolean;
+}) {
+  const chartData = (["Easy", "Medium", "Hard"] as Difficulty[]).map((difficulty) => ({
+    difficulty,
+    value: difficultySolved[difficulty],
+    color: DIFFICULTY_THEME[difficulty].color,
+  }));
+
+  const totalSolved = chartData.reduce((sum, item) => sum + item.value, 0);
+  const size = 190;
+  const strokeWidth = 20;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  let accumulated = 0;
+
+  const segments = chartData.map((item) => {
+    const ratio = totalSolved > 0 ? item.value / totalSolved : 0;
+    const dashLength = ratio * circumference;
+    const segment = {
+      ...item,
+      dashLength,
+      dashOffset: -accumulated,
+    };
+    accumulated += dashLength;
+    return segment;
+  });
+
+  return (
+    <div className="w-full">
+      <div className="relative mx-auto w-[190px] h-[190px]">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="rgba(34, 211, 238, 0.22)"
+              strokeWidth={strokeWidth}
+            />
+
+            {segments.map((segment) =>
+              segment.dashLength > 0 ? (
+                <circle
+                  key={segment.difficulty}
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  fill="none"
+                  stroke={segment.color}
+                  strokeWidth={strokeWidth}
+                  strokeDasharray={`${segment.dashLength} ${circumference - segment.dashLength}`}
+                  strokeDashoffset={segment.dashOffset}
+                  strokeLinecap="round"
+                  style={{
+                    filter: `drop-shadow(0 0 7px ${segment.color})`,
+                  }}
+                />
+              ) : null
+            )}
+          </g>
+        </svg>
+
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
+          <p
+            className="text-[11px] uppercase tracking-[0.18em]"
+            style={{ color: "rgba(34, 211, 238, 0.86)" }}
+          >
+            Solved Mix
+          </p>
+          <p className="text-3xl font-bold" style={{ color: NEON_CYAN }}>
+            {loading ? "--" : totalSolved}
+          </p>
+          <p className="text-xs text-slate-400">Accepted</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -365,15 +455,24 @@ export default function Dashboard() {
               </div>
 
               <div className="mt-2 lg:mt-0">
-                <div className="flex flex-col space-y-2">
+                <DifficultyDoughnutChart
+                  difficultySolved={stats.difficultySolved}
+                  loading={statsLoading}
+                />
+                <div className="flex flex-col space-y-2 mt-4">
                   {(["Easy", "Medium", "Hard"] as Difficulty[]).map((difficulty) => {
-                    const style = DIFFICULTY_STYLES[difficulty];
+                    const theme = DIFFICULTY_THEME[difficulty];
                     return (
                       <div
                         key={difficulty}
-                        className={`px-3 py-1.5 text-sm font-semibold rounded-lg flex justify-between items-center ${style.containerClassName}`}
+                        className="px-3 py-1.5 text-sm font-semibold rounded-lg flex justify-between items-center"
+                        style={{
+                          backgroundColor: theme.bg,
+                          border: `1px solid ${theme.border}`,
+                          boxShadow: `0 0 12px ${theme.color}22`,
+                        }}
                       >
-                        <span className={style.labelClassName}>{difficulty}</span>
+                        <span style={{ color: theme.color }}>{difficulty}</span>
                         <span className="text-gray-300">
                           {statsLoading ? "--" : stats.difficultySolved[difficulty]} Solved
                         </span>
